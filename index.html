@@ -1,0 +1,759 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PinePop</title>
+<link rel="icon" href="roundel.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@100;300&display=swap">
+<style>
+  :root{
+    --thin:"Roboto",-apple-system,"Helvetica Neue",Arial,sans-serif;
+    --sans:"Trebuchet MS","Segoe UI",Helvetica,Arial,sans-serif;
+    --bg:#f6b13c;
+    --ink:#2a1806;
+  }
+  html,body{height:100%;}
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--ink);
+    font-family:var(--thin);
+    font-weight:100;
+    overflow:hidden;
+    touch-action:none;
+    user-select:none;
+    -webkit-user-select:none;
+    -webkit-font-smoothing:antialiased;
+  }
+  canvas{position:fixed;inset:0;width:100%;height:100%;display:block;}
+  #tunnel{z-index:0;}
+  #fx{z-index:1;pointer-events:none;}
+
+  #hud{
+    position:fixed;
+    right:clamp(20px,3.2vw,54px);
+    bottom:clamp(26px,4vw,58px);
+    z-index:4;
+    text-align:right;
+    pointer-events:none;
+    line-height:.92;
+  }
+  #score{
+    display:block;
+    font-size:clamp(2.6rem,7.6vw,7rem);
+    font-weight:100;
+    letter-spacing:-.03em;
+    font-variant-numeric:tabular-nums;
+    text-shadow:0 0 40px rgba(255,214,120,.9);
+  }
+  #meta{
+    display:block;
+    margin-top:.85em;
+    font-size:clamp(.6rem,1.1vw,.78rem);
+    font-weight:300;
+    letter-spacing:.34em;
+    text-transform:uppercase;
+    color:rgba(42,24,6,.55);
+  }
+  #score.hit{animation:kick .18s ease-out;}
+  @keyframes kick{from{transform:scale(1.055);}to{transform:scale(1);}}
+
+  .veil{
+    position:fixed;
+    inset:0;
+    z-index:6;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    gap:1.2rem;
+    text-align:center;
+    padding:24px;
+  }
+  #start{background:rgba(250,196,90,.6);cursor:pointer;}
+  #start h1{margin:0;font-size:clamp(3.4rem,13vw,10rem);font-weight:100;letter-spacing:-.02em;line-height:.85;}
+  #start img{width:clamp(72px,12vw,120px);height:auto;animation:spin 9s linear infinite;}
+  @keyframes spin{to{transform:rotate(360deg);}}
+  #start p{
+    margin:0;
+    font-size:clamp(.72rem,1.5vw,1rem);
+    font-weight:300;
+    letter-spacing:.44em;
+    text-transform:uppercase;
+    color:rgba(42,24,6,.85);
+  }
+  #start small{
+    font-size:clamp(.6rem,1.1vw,.74rem);
+    font-weight:300;
+    letter-spacing:.2em;
+    color:rgba(42,24,6,.7);
+  }
+
+  #win{background:rgba(250,196,90,.5);display:none;}
+  #win.on{display:flex;}
+  #win h1{
+    margin:0;
+    font-size:clamp(3.4rem,15vw,13rem);
+    font-weight:100;
+    letter-spacing:-.02em;
+    line-height:.85;
+    text-wrap:balance;
+  }
+  #win .time{
+    font-size:clamp(1.6rem,5vw,3.4rem);
+    font-weight:100;
+    font-variant-numeric:tabular-nums;
+  }
+  #win .caption{
+    font-size:clamp(.62rem,1.2vw,.8rem);
+    font-weight:300;
+    letter-spacing:.38em;
+    text-transform:uppercase;
+    color:rgba(42,24,6,.6);
+  }
+  .row{display:flex;gap:14px;flex-wrap:wrap;justify-content:center;margin-top:.4rem;}
+  button{
+    appearance:none;
+    background:transparent;
+    color:var(--ink);
+    border:1px solid rgba(42,24,6,.5);
+    padding:13px 26px;
+    font-family:var(--thin);
+    font-weight:300;
+    font-size:.74rem;
+    letter-spacing:.26em;
+    text-transform:uppercase;
+    cursor:pointer;
+    transition:background .18s,border-color .18s;
+  }
+  button:hover{background:rgba(255,255,255,.3);border-color:var(--ink);}
+  button:focus-visible{outline:2px solid var(--ink);outline-offset:3px;}
+  #promo{
+    position:fixed;
+    inset:0;
+    z-index:4;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:24px;
+    text-align:center;
+    pointer-events:none;
+    font-family:var(--sans);
+    font-weight:bold;
+    color:rgba(255,255,255,.9);
+    opacity:0;
+    transition:opacity 2s ease;           /* the slow fade out */
+  }
+  #promo.on{opacity:1;transition:opacity .4s ease;}
+  #promo.on .slam{animation:rise .6s ease-out both;}
+  @keyframes rise{from{transform:translateY(14px);}to{transform:none;}}
+  #promo .slam{
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:.2em;
+    max-width:min(92vw,1100px);
+    font-size:clamp(1.6rem,4.6vw,3.6rem);
+    line-height:1.15;
+    text-wrap:balance;
+  }
+  #win .code{
+    font-family:var(--sans);
+    font-weight:bold;
+    font-size:clamp(1.6rem,4.6vw,3.6rem);   /* matches the offer line */
+    line-height:1.15;
+    color:rgba(255,255,255,.9);
+    text-wrap:balance;
+    user-select:text;
+    -webkit-user-select:text;
+  }
+  #win .code b{font-weight:inherit;}
+  #shared{
+    min-height:1.2em;
+    font-size:.68rem;
+    font-weight:300;
+    letter-spacing:.24em;
+    text-transform:uppercase;
+    color:rgba(42,24,6,.65);
+  }
+</style>
+</head>
+<body>
+<canvas id="tunnel"></canvas>
+<canvas id="fx"></canvas>
+
+<div id="hud">
+  <span id="score">42,000</span>
+  <span id="meta">Pop to zero</span>
+</div>
+
+<div id="promo"><div class="slam">
+  <span>Would you like 42% off our rate card?</span>
+  <span>Reach zero for a unique code!</span>
+</div></div>
+
+<div class="veil" id="start">
+  <img src="roundel.png" alt="">
+  <h1>PinePop</h1>
+  <p>Click to start</p>
+  <small>Faster pineapples take more off &nbsp;·&nbsp; let one escape and half comes back</small>
+</div>
+
+<div class="veil" id="win">
+  <h1>YOU WIN!</h1>
+  <span class="time" id="wintime">0:00.0</span>
+  <span class="caption">Counter cleared</span>
+  <span class="code">Congratulations! Your code is <b id="code"></b></span>
+  <div class="row">
+    <button id="share">Share time</button>
+    <button id="again">Play again</button>
+  </div>
+  <span id="shared"></span>
+</div>
+
+<!-- Used when facts.txt can't be read, e.g. when this page is opened straight
+     from a folder rather than served. facts.txt wins whenever it loads. -->
+<script type="text/plain" id="facts-fallback">
+Award | Ciclope 2024: Gold, Best Direction and Gold, Best Production Design (Music Video)
+Award | Shark Awards 2025: Grand Prix, Best Music Video; Gold, Best R&B/Soul Video; Finalist, Best Post Production
+Award | Creative Circle: Gold, Best VFX (Music Video); Silver, Best Promo Film
+Award | D&AD: Graphite Pencils for Art Direction and Production Design
+Award | British Arrows: Bronze, Best Music Video
+Award | 1.4 Awards: Gold, Best Music Video
+Award | Berlin Music Video Awards: Silver, Best Concept
+Brand | Swatch (Jelly Effect)
+Brand | Costa (Crack A Costa)
+Brand | Adidas x Aston Villa
+Brand | Beats
+Brand | Lego
+Brand | Balenciaga
+Brand | Polestar
+Brand | Tena
+Brand | Nike
+Brand | Nespresso
+Brand | FDA (The Real Cost)
+Brand | Transport for Wales
+Brand | Clash of Clans
+Brand | Piguet Galland
+Brand | Denim Tears
+Brand | PJL
+Brand | KUN
+Brand | Avatar State (Serena Williams, Jutta Leerdam)
+Client | RM Lost
+Client | Fontaines DC
+Client | The Hives
+Client | TOMORA
+Client | Kwengface
+Partner | Pulse Films
+Partner | Partizan
+Partner | MOX
+Partner | RSA
+Partner | Rogue Films
+Partner | Somesuch
+Partner | Untold
+Partner | Future Deluxe
+Partner | Blink Ink
+</script>
+<script>
+(function(){
+  "use strict";
+
+  const FW = 497.33;                   // field width in world units; it spans the screen
+
+  const START_SCORE = 42000;
+
+  const BG = "#f6b13c", LINE = "#d9661a";
+
+  // One mouse can't keep up with what two thumbs can, so desktop gets a
+  // gentler game: fewer, slower pineapples worth more, and escapes cost less.
+  // Pops are worth more as the pace picks up (boost), tuned so a steady
+  // desktop player clears it in about three minutes.
+  const TUNE = window.matchMedia("(pointer: coarse)").matches
+    ? { ramp: 58000,  field: 104, dotLo: 58, dotHi: 70, spawn: [1.6, 2.6], maxDots: 16, mult: 1,   boost: 0,   refund: 0.5 }
+    : { ramp: 150000, field: 12,  dotLo: 8,  dotHi: 10, spawn: [0.9, 0.4], maxDots: 8,  mult: 2.6, boost: 0.6, refund: 0.25 };
+  const roundel = new Image();
+  roundel.src = "roundel.png";
+  // a bright yellow copy for the pineapples carrying a fact
+  let roundelLit = null;
+  roundel.onload = () => {
+    const c = document.createElement("canvas");
+    c.width = roundel.naturalWidth; c.height = roundel.naturalHeight;
+    const g = c.getContext("2d");
+    g.drawImage(roundel, 0, 0);
+    g.globalCompositeOperation = "source-in";
+    g.fillStyle = "#ffd60a";
+    g.fillRect(0, 0, c.width, c.height);
+    roundelLit = c;
+  };
+
+  // ---- the field: endless generated flow lines ------------------------
+  // Across each row, every line gets a share of the width set by a density
+  // that rises and falls with a few slow sine waves of unrelated
+  // frequencies. Lines bunch tight and fan wide like the original artwork,
+  // can never cross, and the pattern never repeats as it scrolls.
+  const LANES = 54, SPAN = FW + 40;
+  const rowX = new Float32Array(LANES);
+  function row(y){
+    let c = 0;
+    for (let i = 0; i < LANES; i++){
+      const n = Math.sin(0.21 * i + 0.0090 * y)
+              + 0.8 * Math.sin(0.34 * i - 0.0120 * y + 2.0)
+              + 0.6 * Math.sin(0.11 * i + 0.0045 * y + 4.0);
+      const w = Math.exp(0.9 * n);
+      rowX[i] = c + w / 2; c += w;
+    }
+    const wig = 3.5 * Math.sin(0.085 * y) * (0.6 + 0.4 * Math.sin(0.004 * y));
+    for (let i = 0; i < LANES; i++) rowX[i] = -SPAN / 2 + SPAN * rowX[i] / c + wig * Math.cos(0.15 * i);
+    return rowX;
+  }
+  const lineX = (i, y) => row(y)[i];
+
+  // ---- canvases ------------------------------------------------------
+  const bg = document.getElementById("tunnel"), bx = bg.getContext("2d");
+  const fg = document.getElementById("fx"),     fx = fg.getContext("2d");
+  const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  let W = 0, H = 0, CX = 0, scale = 1, Hworld = 1, DOT_R = 26, fade = null;
+
+  function layout(){
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    W = window.innerWidth; H = window.innerHeight;
+    for (const c of [bg, fg]){
+      c.width = Math.round(W * dpr); c.height = Math.round(H * dpr);
+      c.getContext("2d").setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+    CX = W / 2;
+    scale = W / FW;                       // the field spans the full width
+    Hworld = H / scale;
+    DOT_R = Math.max(22, Math.min(52, 0.036 * Math.min(W, H)));
+    fade = bx.createLinearGradient(0, 0, 0, H * 0.42);
+    fade.addColorStop(0, "rgba(246,177,60,1)");
+    fade.addColorStop(1, "rgba(246,177,60,0)");
+  }
+  layout();
+  window.addEventListener("resize", layout);
+
+  // ---- state ---------------------------------------------------------
+  const S = { phase: "ready", score: START_SCORE, t0: 0, elapsed: 0, spawnAcc: 0, cam: 0 };
+  const dots = [], bursts = [], floats = [], tape = [];
+
+  const scoreEl = document.getElementById("score");
+  const fmt = n => n.toLocaleString("en-GB");
+  const progress = () => 1 - S.score / START_SCORE;
+
+  // Difficulty runs on the clock as well as the counter, so the tunnel is
+  // always at pace by a minute in whether or not you are hitting anything.
+  function heat(){
+    const byClock = S.phase === "play" ? (performance.now() - S.t0) / TUNE.ramp : 0;
+    return Math.max(0, Math.min(1.4, Math.max(progress(), byClock)));
+  }
+
+  // the whole field drifts upward, unhurried for the first few seconds only
+  const fieldSpeed = () => 15.6 + TUNE.field * heat();
+
+  // ---- audio ---------------------------------------------------------
+  let AC = null;
+  function blip(freq){
+    try{
+      if (!AC) AC = new (window.AudioContext || window.webkitAudioContext)();
+      const o = AC.createOscillator(), g = AC.createGain(), t = AC.currentTime;
+      o.type = "sine";
+      o.frequency.setValueAtTime(freq, t);
+      o.frequency.exponentialRampToValueAtTime(freq * 0.42, t + 0.11);
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(0.22, t + 0.006);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.15);
+      o.connect(g).connect(AC.destination);
+      o.start(t); o.stop(t + 0.17);
+    }catch(e){ /* sound is a bonus, never a blocker */ }
+  }
+
+  // ---- pineapple facts --------------------------------------------------
+  // Lines of facts.txt ("Label | text") hitch a ride on a pineapple on the
+  // left of the screen every few pops, worked through in a shuffled order.
+  const SANS = '"Trebuchet MS", "Segoe UI", Helvetica, Arial, sans-serif';
+  let FACTS = [], factQueue = [], popsToFact = 2, factDue = false;
+  const lingers = [];
+
+  function readFacts(txt){
+    FACTS = txt.split(/\r?\n/).map(l => l.trim()).filter(Boolean).map(l => {
+      const bar = l.indexOf("|");
+      return bar < 0 ? { label: "", text: l } : { label: l.slice(0, bar).trim(), text: l.slice(bar + 1).trim() };
+    });
+    factQueue = [];
+  }
+  readFacts(document.getElementById("facts-fallback").textContent);
+  fetch("facts.txt").then(r => r.ok ? r.text() : "").then(txt => { if (txt.trim()) readFacts(txt); })
+    .catch(() => { /* opened from a folder: the built-in copy stands */ });
+
+  function nextFact(){
+    if (!factQueue.length){
+      factQueue = FACTS.slice();
+      for (let i = factQueue.length - 1; i > 0; i--){
+        const j = (Math.random() * (i + 1)) | 0;
+        [factQueue[i], factQueue[j]] = [factQueue[j], factQueue[i]];
+      }
+    }
+    return factQueue.pop();
+  }
+
+  function wrap(text, maxW){
+    const out = [];
+    let line = "";
+    for (const word of text.split(" ")){
+      const next = line ? line + " " + word : word;
+      if (line && fx.measureText(next).width > maxW){ out.push(line); line = word; }
+      else line = next;
+    }
+    if (line) out.push(line);
+    return out;
+  }
+
+  // the lowest pineapple on the left, so the fact has the whole climb to be read
+  function hitchFact(){
+    if (!FACTS.length) return;
+    let pick = null;
+    for (const d of dots){
+      if (!d.alive || d.fact || d.x < d.rad || d.x > W * 0.42 || d.y < H * 0.5 || d.y > H - d.rad) continue;
+      if (!pick || d.y > pick.y) pick = d;
+    }
+    if (!pick) return;                             // try again next frame
+    const f = nextFact();
+    const size = Math.round(Math.max(16, Math.min(22, W * 0.02)));
+    fx.font = "bold " + size + "px " + SANS;
+    pick.fact = { label: f.label, lines: wrap(f.text, Math.min(W * 0.5, 30 * size)), size, age: 0 };
+    factDue = false;
+    popsToFact = 3 + ((Math.random() * 3) | 0);
+  }
+
+  // half a second after a fact hitches on, its pineapple turns yellow and the text fades up
+  const glow = f => Math.max(0, Math.min(1, (f.age - 0.5) / 0.6));
+
+  function drawFact(f, x, y, rad, alpha){
+    const lh = f.size * 1.25;
+    const rows = f.lines.length + (f.label ? 1 : 0);
+    const tx = x + rad + 14;
+    let ty = y - rows * lh / 2 + lh * 0.78;
+    fx.textAlign = "left";
+    fx.fillStyle = "#ffffff";
+    if (f.label){
+      fx.globalAlpha = alpha * 0.7;
+      fx.font = "bold " + Math.round(f.size * 0.78) + "px " + SANS;
+      fx.fillText(f.label, tx, ty);
+      ty += lh;
+    }
+    fx.globalAlpha = alpha * 0.9;
+    fx.font = "bold " + f.size + "px " + SANS;
+    for (const l of f.lines){ fx.fillText(l, tx, ty); ty += lh; }
+    fx.globalAlpha = 1;
+  }
+
+  // ---- dots ----------------------------------------------------------
+  // A dot rides one line, always entering from below the bottom edge and
+  // climbing it for as long as it stays on screen.
+  function spawn(){
+    const hot = Math.min(1, heat());
+    const wy = S.cam + Hworld + 30;               // just off the bottom
+    let i = -1;
+    for (let tries = 0; tries < 10 && i < 0; tries++){
+      const c = (Math.random() * LANES) | 0;
+      if (Math.abs(lineX(c, wy)) < FW / 2 - 24) i = c;   // well inside the edges
+    }
+    if (i < 0) return;
+
+    const lo = 14.4 + TUNE.dotLo * hot, hi = lo + 19.2 + TUNE.dotHi * hot;
+    const v = lo + Math.random() * (hi - lo);
+    dots.push({
+      i, wy, v,
+      seed: Math.random() * 6.283, spin: (Math.random() < 0.5 ? -1 : 1) * (0.6 + Math.random() * 1.2), x: 0, y: 0, rad: DOT_R, a: 1, alive: true
+    });
+  }
+
+  function value(v){
+    const k = Math.max(0, Math.min(1, (v - 14.4) / 170));
+    return Math.round((140 + 620 * Math.pow(k, 1.3)) * TUNE.mult * (1 + TUNE.boost * Math.min(1, heat())));
+  }
+
+  // ---- input ----------------------------------------------------------
+  function tryPop(mx, my){
+    let best = -1, bestD = 1e9;
+    for (let i = 0; i < dots.length; i++){
+      const d = dots[i];
+      if (!d.alive || d.a < 0.15) continue;
+      const dist = Math.hypot(d.x - mx, d.y - my);
+      if (dist <= d.rad + 14 && dist < bestD){ best = i; bestD = dist; }
+    }
+    if (best < 0) return;
+
+    const d = dots[best];
+    d.alive = false;
+    const gained = Math.min(value(d.v) * (d.fact ? 2 : 1), S.score);   // facts score double
+    S.score -= gained;
+
+    if (d.fact) lingers.push({ x: d.x, y: d.y, rad: d.rad, a: d.a, fact: d.fact, age: 0 });
+    if (--popsToFact <= 0) factDue = true;
+
+    bursts.push({ x: d.x, y: d.y, r: d.rad, age: 0, life: 0.5 });
+    floats.push({ x: d.x, y: d.y, text: "−" + fmt(gained), age: 0, life: 0.9 });
+    blip(300 + d.v * 2.6 + Math.random() * 50);
+
+    scoreEl.textContent = fmt(S.score);
+    scoreEl.classList.remove("hit"); void scoreEl.offsetWidth; scoreEl.classList.add("hit");
+    if (S.score <= 0) win();
+  }
+
+  // a dot that reaches the top puts some of what it was worth back on
+  function escaped(d){
+    if (S.phase !== "play") return;
+    const back = Math.min(Math.round(value(d.v) * TUNE.refund), START_SCORE - S.score);
+    if (back <= 0) return;
+    S.score += back;
+    floats.push({ x: d.x, y: Math.max(28, d.y + DOT_R * 2), text: "+" + fmt(back), age: 0, life: 1.0, bad: true });
+    scoreEl.textContent = fmt(S.score);
+    blip(120);
+  }
+
+  window.addEventListener("pointerdown", e => {
+    if (S.phase === "ready"){ begin(); return; }
+    if (S.phase === "play") tryPop(e.clientX, e.clientY);
+  });
+
+  // ---- phases ----------------------------------------------------------
+  const startEl = document.getElementById("start");
+  const winEl = document.getElementById("win");
+  const winTime = document.getElementById("wintime");
+  const sharedEl = document.getElementById("shared");
+  const promoEl = document.getElementById("promo");
+  const codeEl = document.getElementById("code");
+
+  const newCode = ms => "PINEPOP" + Math.round(ms / 1000);   // seconds played
+
+  function begin(){
+    S.phase = "play"; S.score = START_SCORE; S.t0 = performance.now(); S.spawnAcc = 0;
+    dots.length = 0; bursts.length = 0; floats.length = 0; tape.length = 0; lingers.length = 0;
+    popsToFact = 2; factDue = false;
+    scoreEl.textContent = fmt(START_SCORE);
+    startEl.style.display = "none";
+    winEl.classList.remove("on");
+    promoEl.classList.remove("on");
+    sharedEl.textContent = "";
+    blip(520);
+  }
+
+  function stamp(ms){
+    const s = ms / 1000, m = Math.floor(s / 60);
+    return m + ":" + String(Math.floor(s % 60)).padStart(2, "0") + "." + Math.floor((s % 1) * 10);
+  }
+
+  function win(){
+    S.phase = "won";
+    S.elapsed = performance.now() - S.t0;
+    winTime.textContent = stamp(S.elapsed);
+    codeEl.textContent = newCode(S.elapsed);
+    promoEl.classList.remove("on");
+    winEl.classList.add("on");
+    for (let i = 0; i < 480; i++) tape.push(newTape());
+    [0, 120, 240, 380, 560].forEach((ms, i) => setTimeout(() => blip(660 + i * 130), ms));
+  }
+
+  // the 🍍 emoji drawn once to a sprite, so hundreds of them stay cheap to draw
+  let pineSprite = null;
+  function pine(){
+    if (pineSprite) return pineSprite;
+    const c = document.createElement("canvas");
+    c.width = c.height = 128;
+    const g = c.getContext("2d");
+    g.font = '104px "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif';
+    g.textAlign = "center"; g.textBaseline = "middle";
+    g.fillText("\u{1F34D}", 64, 70);
+    return (pineSprite = c);
+  }
+
+  function newTape(){
+    return {
+      x: CX + (Math.random() - 0.5) * W * 0.5,
+      y: H / 2 + (Math.random() - 0.5) * H * 0.3,
+      vx: (Math.random() - 0.5) * 1500,
+      vy: -260 - Math.random() * 1100,
+      size: 66 + Math.random() * 90,
+      a: (Math.random() - 0.5) * 1.2, va: (Math.random() - 0.5) * 7,
+      sway: 0.6 + Math.random() * 2.4
+    };
+  }
+
+  document.getElementById("again").addEventListener("click", e => { e.stopPropagation(); begin(); });
+  document.getElementById("share").addEventListener("click", async e => {
+    e.stopPropagation();
+    const text = "Cleared " + fmt(START_SCORE) + " in " + stamp(S.elapsed) + " — PinePop";
+    try{
+      if (navigator.share){ await navigator.share({ title: "PinePop", text }); sharedEl.textContent = "Shared"; return; }
+      await navigator.clipboard.writeText(text);
+      sharedEl.textContent = "Copied to clipboard";
+    }catch(err){ sharedEl.textContent = text; }
+  });
+
+  // ---- draw: the sliding field -----------------------------------------
+  let grid = new Float32Array(0);
+  function drawField(){
+    bx.fillStyle = BG;
+    bx.fillRect(0, 0, W, H);
+    bx.strokeStyle = LINE;
+    bx.globalAlpha = 0.8;
+    bx.lineWidth = 2.6;
+    bx.lineJoin = "round";
+    bx.lineCap = "round";
+
+    const y0 = S.cam - 10, rows = Math.ceil((Hworld + 20) / 4) + 1;
+    if (grid.length < rows * LANES) grid = new Float32Array(rows * LANES);
+    for (let r = 0; r < rows; r++) grid.set(row(y0 + r * 4), r * LANES);
+    bx.beginPath();
+    for (let i = 0; i < LANES; i++){
+      for (let r = 0; r < rows; r++){
+        const px = CX + grid[r * LANES + i] * scale, py = (y0 + r * 4 - S.cam) * scale;
+        if (r === 0) bx.moveTo(px, py); else bx.lineTo(px, py);
+      }
+    }
+    bx.stroke();
+    bx.globalAlpha = 1;
+
+    // the far end of the tunnel fades into the orange
+    bx.fillStyle = fade;
+    bx.fillRect(0, 0, W, H * 0.42);
+  }
+
+  // ---- draw: dots, bursts, pineapple rain ----------------------------------------
+  function drawFx(t, dt){
+    fx.clearRect(0, 0, W, H);
+
+    for (let i = dots.length - 1; i >= 0; i--){
+      const d = dots[i];
+      if (!d.alive){ dots.splice(i, 1); continue; }
+
+      // climb the line at speed v measured along it
+      const slope = (lineX(d.i, d.wy - 1) - lineX(d.i, d.wy + 1)) / 2;
+      d.wy -= d.v * dt / Math.hypot(1, slope);
+      d.x = CX + lineX(d.i, d.wy) * scale;
+      d.y = (d.wy - S.cam) * scale;
+      d.rad = DOT_R;
+
+      if (d.y < -DOT_R * 2){ escaped(d); dots.splice(i, 1); continue; }
+      // fade into the distance rather than clipping off the top edge
+      d.a = Math.max(0, Math.min(1, d.y / (H * 0.18)));
+    }
+
+    // facts: riding pineapples, and the ones left behind by a pop fading out
+    for (let i = lingers.length - 1; i >= 0; i--){
+      const g = lingers[i];
+      g.age += dt;
+      if (g.age >= 0.8){ lingers.splice(i, 1); continue; }
+      g.y -= fieldSpeed() * scale * dt;
+      drawFact(g.fact, g.x, g.y, g.rad, g.a * glow(g.fact) * (1 - g.age / 0.8));
+    }
+    for (const d of dots){
+      if (!d.fact || d.a <= 0.01) continue;
+      d.fact.age += dt;
+      drawFact(d.fact, d.x, d.y, d.rad, d.a * glow(d.fact));
+    }
+
+    for (const d of dots){
+      if (d.a <= 0.01) continue;
+      const rr = d.rad * (1 + 0.05 * Math.sin(t * 5 + d.seed));
+      fx.globalAlpha = d.a;
+      if (roundel.complete && roundel.naturalWidth){
+        fx.save();
+        fx.translate(d.x, d.y);
+        fx.rotate(t * d.spin + d.seed);
+        fx.drawImage(roundel, -rr, -rr, rr * 2, rr * 2);
+        if (d.fact && roundelLit){                 // yellow laid over the black as it glows
+          fx.globalAlpha = d.a * glow(d.fact);
+          fx.drawImage(roundelLit, -rr, -rr, rr * 2, rr * 2);
+        }
+        fx.restore();
+      }
+      fx.globalAlpha = 1;
+    }
+
+    for (let i = bursts.length - 1; i >= 0; i--){
+      const b = bursts[i];
+      b.age += dt;
+      const k = b.age / b.life;
+      if (k >= 1){ bursts.splice(i, 1); continue; }
+      const e = 1 - Math.pow(1 - k, 3);
+      fx.beginPath();
+      fx.arc(b.x, b.y, b.r * (1 + e * 2.4), 0, 6.283);
+      fx.lineWidth = Math.max(0.8, b.r * 0.3 * (1 - e));
+      fx.strokeStyle = "rgba(42,24,6," + (1 - e).toFixed(3) + ")";
+      fx.stroke();
+      for (let n = 0; n < 8; n++){
+        const ang = b.age * 2 + n * 0.785;
+        const rr = b.r * (1 + e * 3.8);
+        fx.beginPath();
+        fx.arc(b.x + Math.cos(ang) * rr, b.y + Math.sin(ang) * rr, Math.max(0.8, b.r * 0.16 * (1 - e)), 0, 6.283);
+        fx.fillStyle = "rgba(255,243,196," + ((1 - e) * 0.95).toFixed(3) + ")";
+        fx.fill();
+      }
+    }
+
+    fx.textAlign = "center";
+    for (let i = floats.length - 1; i >= 0; i--){
+      const f = floats[i];
+      f.age += dt;
+      const k = f.age / f.life;
+      if (k >= 1){ floats.splice(i, 1); continue; }
+      fx.globalAlpha = (1 - k * k) * (f.bad ? 0.85 : 1);
+      fx.font = "300 24px Roboto, sans-serif";
+      fx.fillStyle = f.bad ? "#b3261e" : "#2a1806";
+      fx.fillText(f.text, f.x, f.y + (f.bad ? 24 + k * 34 : -22 - k * 46));
+      fx.globalAlpha = 1;
+    }
+
+    if (tape.length){
+      for (let i = tape.length - 1; i >= 0; i--){
+        const p = tape[i];
+        p.vy += 1450 * dt;
+        p.vx *= 0.992;
+        p.x += (p.vx + Math.sin(t * p.sway + p.a) * 60) * dt;
+        p.y += p.vy * dt;
+        p.a += p.va * dt;
+        if (p.y > H + 80){ tape.splice(i, 1); continue; }
+        fx.save();
+        fx.translate(p.x, p.y);
+        fx.rotate(p.a);
+        fx.drawImage(pine(), -p.size / 2, -p.size / 2, p.size, p.size);
+        fx.restore();
+      }
+      if (S.phase === "won" && tape.length < 140 && Math.random() < 0.6) tape.push(newTape());
+    }
+  }
+
+  // ---- loop -------------------------------------------------------------
+  let last = performance.now();
+  function frame(nowMs){
+    const dt = Math.min(0.05, (nowMs - last) / 1000);
+    last = nowMs;
+    const t = nowMs / 1000;
+
+    if (!reduce) S.cam += fieldSpeed() * dt;
+    drawField();
+
+    if (S.phase === "play"){
+      // in at 5s, held for 10s, then the 2s fade in the CSS takes it away
+      const since = nowMs - S.t0;
+      if (factDue && since > 15000) hitchFact();   // facts start once the offer has gone
+      promoEl.classList.toggle("on", since > 5000 && since < 15000);
+      S.spawnAcc += dt * (TUNE.spawn[0] + TUNE.spawn[1] * Math.min(1, heat()));
+      while (S.spawnAcc >= 1 && dots.length < TUNE.maxDots){ S.spawnAcc -= 1; spawn(); }
+      if (S.spawnAcc > 3) S.spawnAcc = 3;
+    }
+
+    drawFx(t, dt);
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
