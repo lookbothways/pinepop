@@ -199,7 +199,7 @@
   <img src="roundel.png" alt="">
   <h1>PinePop</h1>
   <p>Click to start</p>
-  <small>Faster pineapples take more off &nbsp;·&nbsp; let one escape and half comes back</small>
+  <small>Faster pineapples take more off &nbsp;·&nbsp; let one escape and a little comes back</small>
 </div>
 
 <div class="veil" id="win">
@@ -269,11 +269,13 @@ Partner | Blink Ink
 
   // One mouse can't keep up with what two thumbs can, so desktop gets a
   // gentler game: fewer, slower pineapples worth more, and escapes cost less.
-  // Pops are worth more as the pace picks up (boost), tuned so a steady
-  // desktop player clears it in about three minutes.
+  // Both are frantic: lots of pineapples, often several at once, worth a lot
+  // each and soon at full pace. Escapes cost little, or the swarm getting
+  // past you would cancel out the scoring. One mouse can't match two thumbs,
+  // so desktop is slower, and its pops are worth more as the pace picks up (boost).
   const TUNE = window.matchMedia("(pointer: coarse)").matches
-    ? { ramp: 58000,  field: 104, dotLo: 58, dotHi: 70, spawn: [1.6, 2.6], maxDots: 16, mult: 1,   boost: 0,   refund: 0.5 }
-    : { ramp: 150000, field: 12,  dotLo: 8,  dotHi: 10, spawn: [0.9, 0.4], maxDots: 8,  mult: 2.6, boost: 0.6, refund: 0.25 };
+    ? { ramp: 23000,  field: 104, dotLo: 58, dotHi: 70, spawn: [4.8, 7.8], maxDots: 48, mult: 2,   boost: 0,   refund: 0.12 }
+    : { ramp: 60000,  field: 12,  dotLo: 8,  dotHi: 10, spawn: [2.7, 1.2], maxDots: 24, mult: 5.2, boost: 0.6, refund: 0.12 };
   const roundel = new Image();
   roundel.src = "roundel.png";
   // a bright yellow copy for the pineapples carrying a fact
@@ -412,25 +414,22 @@ Partner | Blink Ink
     return out;
   }
 
-  // the lowest pineapple on the left, so the fact has the whole climb to be read
-  function hitchFact(){
-    if (!FACTS.length) return;
-    let pick = null;
-    for (const d of dots){
-      if (!d.alive || d.fact || d.x < d.rad || d.x > W * 0.42 || d.y < H * 0.5 || d.y > H - d.rad) continue;
-      if (!pick || d.y > pick.y) pick = d;
-    }
-    if (!pick) return;                             // try again next frame
+  // A fact rides a pineapple from the moment it spawns below the screen, on
+  // the left so the text has room, once the offer has gone, two at a time at most.
+  function hitchFact(d){
+    if (!FACTS.length || performance.now() - S.t0 < 12000) return;
+    const x = CX + lineX(d.i, d.wy) * scale;
+    if (x < DOT_R || x > W * 0.42) return;          // try the next one
+    let riding = 0;
+    for (const o of dots) if (o.alive && o.fact) riding++;
+    if (riding >= 2) return;
     const f = nextFact();
     const size = Math.round(Math.max(16, Math.min(22, W * 0.02)));
     fx.font = "bold " + size + "px " + SANS;
-    pick.fact = { label: f.label, lines: wrap(f.text, Math.min(W * 0.5, 30 * size)), size, age: 0 };
+    d.fact = { label: f.label, lines: wrap(f.text, Math.min(W * 0.5, 30 * size)), size };
     factDue = false;
     popsToFact = 3 + ((Math.random() * 3) | 0);
   }
-
-  // half a second after a fact hitches on, its pineapple turns yellow and the text fades up
-  const glow = f => Math.max(0, Math.min(1, (f.age - 0.5) / 0.6));
 
   function drawFact(f, x, y, rad, alpha){
     const lh = f.size * 1.25;
@@ -454,9 +453,9 @@ Partner | Blink Ink
   // ---- dots ----------------------------------------------------------
   // A dot rides one line, always entering from below the bottom edge and
   // climbing it for as long as it stays on screen.
-  function spawn(){
+  function spawn(below){
     const hot = Math.min(1, heat());
-    const wy = S.cam + Hworld + 30;               // just off the bottom
+    const wy = S.cam + Hworld + 30 + below;       // just off the bottom
     let i = -1;
     for (let tries = 0; tries < 10 && i < 0; tries++){
       const c = (Math.random() * LANES) | 0;
@@ -466,10 +465,12 @@ Partner | Blink Ink
 
     const lo = 14.4 + TUNE.dotLo * hot, hi = lo + 19.2 + TUNE.dotHi * hot;
     const v = lo + Math.random() * (hi - lo);
-    dots.push({
+    const d = {
       i, wy, v,
       seed: Math.random() * 6.283, spin: (Math.random() < 0.5 ? -1 : 1) * (0.6 + Math.random() * 1.2), x: 0, y: 0, rad: DOT_R, a: 1, alive: true
-    });
+    };
+    if (factDue) hitchFact(d);
+    dots.push(d);
   }
 
   function value(v){
@@ -650,12 +651,11 @@ Partner | Blink Ink
       g.age += dt;
       if (g.age >= 0.8){ lingers.splice(i, 1); continue; }
       g.y -= fieldSpeed() * scale * dt;
-      drawFact(g.fact, g.x, g.y, g.rad, g.a * glow(g.fact) * (1 - g.age / 0.8));
+      drawFact(g.fact, g.x, g.y, g.rad, g.a * (1 - g.age / 0.8));
     }
     for (const d of dots){
       if (!d.fact || d.a <= 0.01) continue;
-      d.fact.age += dt;
-      drawFact(d.fact, d.x, d.y, d.rad, d.a * glow(d.fact));
+      drawFact(d.fact, d.x, d.y, d.rad, d.a);
     }
 
     for (const d of dots){
@@ -666,11 +666,7 @@ Partner | Blink Ink
         fx.save();
         fx.translate(d.x, d.y);
         fx.rotate(t * d.spin + d.seed);
-        fx.drawImage(roundel, -rr, -rr, rr * 2, rr * 2);
-        if (d.fact && roundelLit){                 // yellow laid over the black as it glows
-          fx.globalAlpha = d.a * glow(d.fact);
-          fx.drawImage(roundelLit, -rr, -rr, rr * 2, rr * 2);
-        }
+        fx.drawImage(d.fact && roundelLit ? roundelLit : roundel, -rr, -rr, rr * 2, rr * 2);
         fx.restore();
       }
       fx.globalAlpha = 1;
@@ -740,12 +736,16 @@ Partner | Blink Ink
     drawField();
 
     if (S.phase === "play"){
-      // in at 5s, held for 10s, then the 2s fade in the CSS takes it away
+      // in at 5s, held for 5s, then the 2s fade in the CSS takes it away
       const since = nowMs - S.t0;
-      if (factDue && since > 15000) hitchFact();   // facts start once the offer has gone
-      promoEl.classList.toggle("on", since > 5000 && since < 15000);
+      promoEl.classList.toggle("on", since > 5000 && since < 10000);
       S.spawnAcc += dt * (TUNE.spawn[0] + TUNE.spawn[1] * Math.min(1, heat()));
-      while (S.spawnAcc >= 1 && dots.length < TUNE.maxDots){ S.spawnAcc -= 1; spawn(); }
+      while (S.spawnAcc >= 1 && dots.length < TUNE.maxDots){
+        // often several at once; a cluster draws ahead on what's owed, so the average rate holds
+        const n = Math.random() < 0.4 ? 2 + ((Math.random() * 3) | 0) : 1;
+        for (let k = 0; k < n && dots.length < TUNE.maxDots; k++) spawn(k * 14);
+        S.spawnAcc -= n;
+      }
       if (S.spawnAcc > 3) S.spawnAcc = 3;
     }
 
